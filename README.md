@@ -1,4 +1,4 @@
-# LinkUp - Team Task Manager
+  Team Task Manager
 
 A full-stack team task management app with authentication, RBAC, project management, task tracking, and dashboards.
 
