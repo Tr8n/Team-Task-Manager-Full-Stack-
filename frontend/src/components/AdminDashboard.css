@@ -1,0 +1,120 @@
+.admin-dashboard {
+  min-height: calc(100vh - 68px);
+  padding: 1.5rem;
+}
+
+.admin-dashboard-header {
+  margin-bottom: 1.25rem;
+}
+
+.admin-dashboard-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.admin-dashboard-header p {
+  margin: 0.4rem 0 0;
+  color: var(--text-secondary);
+}
+
+.admin-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.admin-metric-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-metric-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.admin-metric-value {
+  font-size: 1.25rem;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.admin-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.8rem;
+}
+
+.admin-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.admin-panel h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+}
+
+.admin-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.admin-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 0.9fr;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.admin-row-task {
+  grid-template-columns: 1.5fr 1fr 0.7fr;
+}
+
+.admin-empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.admin-dashboard-state {
+  min-height: calc(100vh - 68px);
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.admin-dashboard-state.error {
+  color: var(--error-color);
+}

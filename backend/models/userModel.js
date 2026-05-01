@@ -5,11 +5,12 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
 const userSchema = new mongoose.Schema({
-  username: {
+  name: {
     type: String,
     required: true,
-    unique: true,
-    trim: true
+    trim: true,
+    minlength: 2,
+    maxlength: 50
   },
   email: {
     type: String,
@@ -20,8 +21,13 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true
+  },
+  role: {
+    type: String,
+    enum: ['ADMIN', 'MEMBER'],
+    default: 'MEMBER'
   }
-});
+}, { timestamps: true });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -38,9 +44,9 @@ userSchema.methods.comparePassword = function(candidatePassword) {
 // Method to generate JWT token
 userSchema.methods.generateJWT = function() {
   return jwt.sign(
-    { id: this._id, username: this.username, email: this.email },
+    { id: this._id, name: this.name, email: this.email, role: this.role },
     JWT_SECRET,
-    { expiresIn: '1h' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 };
 

@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Local development API URL
-const API_BASE_URL = 'https://linkup-1-ke2l.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -40,21 +39,26 @@ api.interceptors.response.use(
 
 // Auth endpoints
 export const authAPI = {
-  register: (userData) => api.post('/users/signup', userData),
-  login: (userData) => api.post('/users/login', userData),
+  register: (userData) => api.post('/auth/signup', userData),
+  login: (userData) => api.post('/auth/login', userData),
+  users: () => api.get('/users'),
 };
 
-// Links endpoints with AI features
-export const linksAPI = {
-  getAll: (params = {}) => api.get('/links', { params }),
-  create: (linkData) => api.post('/links', linkData),
-  update: (id, linkData) => api.put(`/links/${id}`, linkData),
-  delete: (id) => api.delete(`/links/${id}`),
-  getById: (id) => api.get(`/links/${id}`),
-  getCategories: () => api.get('/links/categories'),
-  getStats: () => api.get('/links/stats'),
-  toggleFavorite: (id) => api.patch(`/links/${id}/favorite`),
-  reanalyze: (id) => api.post(`/links/${id}/reanalyze`),
+export const projectsAPI = {
+  create: (payload) => api.post('/projects', payload),
+  list: () => api.get('/projects'),
+  addMember: (projectId, userId) => api.patch(`/projects/${projectId}/members`, { userId }),
+};
+
+export const tasksAPI = {
+  create: (payload) => api.post('/tasks', payload),
+  list: (params = {}) => api.get('/tasks', { params }),
+  updateStatus: (taskId, status) => api.patch(`/tasks/${taskId}/status`, { status }),
+};
+
+export const dashboardAPI = {
+  get: () => api.get('/dashboard'),
+  admin: () => api.get('/dashboard/admin'),
 };
 
 export default api; 

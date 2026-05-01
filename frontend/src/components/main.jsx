@@ -1,615 +1,275 @@
-import React, { useState, useEffect } from 'react';
-import { linksAPI } from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { authAPI, projectsAPI, tasksAPI, dashboardAPI } from '../services/api';
 import Sidebar from './Sidebar';
-import Contact from './Contact';
 import './Main.css';
 
 const Main = () => {
-  const [links, setLinks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editingLink, setEditingLink] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showContact, setShowContact] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [contentTypeFilter, setContentTypeFilter] = useState('all');
-  const [complexityFilter, setComplexityFilter] = useState('all');
-  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  const [duplicateInfo, setDuplicateInfo] = useState(null);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Form state
-  const [formData, setFormData] = useState({
+  const [projectForm, setProjectForm] = useState({
     name: '',
-    url: '',
     description: '',
-    category: 'other',
-    colorTag: 'blue',
-    tags: '',
-    isFavorite: false
+    memberIds: ''
+  });
+
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    projectId: '',
+    newProjectName: '',
+    assignedTo: '',
+    dueDate: ''
   });
 
   useEffect(() => {
-    fetchLinks();
-  }, [selectedCategory, searchTerm, sortBy, sortOrder, contentTypeFilter, complexityFilter]);
+    fetchAll();
+  }, [statusFilter]);
 
-  const fetchLinks = async () => {
+  const fetchAll = async () => {
     try {
       setLoading(true);
-      const params = {
-        sortBy,
-        sortOrder,
-        search: searchTerm || undefined
-      };
-
-      if (selectedCategory === 'favorites') {
-        params.favorite = 'true';
-      } else if (selectedCategory !== 'all') {
-        params.category = selectedCategory;
-      }
-
-      if (contentTypeFilter !== 'all') {
-        params.contentType = contentTypeFilter;
-      }
-
-      if (complexityFilter !== 'all') {
-        params.complexity = complexityFilter;
-      }
-
-      const response = await linksAPI.getAll(params);
-      setLinks(response.data);
+      const [projectsRes, tasksRes, usersRes, dashboardRes] = await Promise.all([
+        projectsAPI.list(),
+        tasksAPI.list(statusFilter === 'ALL' ? {} : { status: statusFilter }),
+        authAPI.users(),
+        dashboardAPI.get()
+      ]);
+      setProjects(projectsRes.data || []);
+      setTasks(tasksRes.data || []);
+      setUsers(usersRes.data || []);
+      setDashboard(dashboardRes.data || null);
       setError('');
-    } catch (error) {
-      setError('Failed to fetch links');
-      console.error('Error fetching links:', error);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleProjectSubmit = async (e) => {
     e.preventDefault();
     try {
-      const linkData = {
-        ...formData,
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
-      };
+      await projectsAPI.create({
+        name: projectForm.name,
+        description: projectForm.description,
+        memberIds: projectForm.memberIds.split(',').map((id) => id.trim()).filter(Boolean)
+      });
+      setProjectForm({ name: '', description: '', memberIds: '' });
+      setShowProjectForm(false);
+      fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create project');
+    }
+  };
 
-      if (editingLink) {
-        await linksAPI.update(editingLink._id, linkData);
-        setEditingLink(null);
-      } else {
-        const response = await linksAPI.create(linkData);
-        
-        // Check for duplicate warning
-        if (response.data.duplicateInfo && response.data.duplicateInfo.isDuplicate) {
-          setDuplicateInfo(response.data.duplicateInfo);
-          setShowDuplicateWarning(true);
+  const handleTaskSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      let projectId = taskForm.projectId;
+
+      if (projectId === '__new__') {
+        const trimmedProjectName = taskForm.newProjectName.trim();
+        if (!trimmedProjectName) {
+          setError('Please enter a new project name');
           return;
         }
+
+        const memberIds = taskForm.assignedTo ? [taskForm.assignedTo] : [];
+        const createdProject = await projectsAPI.create({
+          name: trimmedProjectName,
+          description: `Auto-created while creating task: ${taskForm.title}`,
+          memberIds
+        });
+        projectId = createdProject?.data?._id;
       }
 
-      resetForm();
-      fetchLinks();
-    } catch (error) {
-      if (error.response?.status === 409) {
-        // Duplicate detected
-        setDuplicateInfo(error.response.data.duplicateInfo);
-        setShowDuplicateWarning(true);
-      } else {
-        setError('Failed to save link');
-        console.error('Error saving link:', error);
-      }
+      await tasksAPI.create({
+        title: taskForm.title,
+        description: taskForm.description,
+        projectId,
+        assignedTo: taskForm.assignedTo,
+        dueDate: taskForm.dueDate
+      });
+      setTaskForm({ title: '', description: '', projectId: '', newProjectName: '', assignedTo: '', dueDate: '' });
+      setShowTaskForm(false);
+      fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create task');
     }
   };
 
-  const handleDuplicateConfirm = async () => {
+  const handleStatusUpdate = async (taskId, status) => {
     try {
-      const linkData = {
-        ...formData,
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
-      };
-      
-      await linksAPI.create(linkData);
-      setShowDuplicateWarning(false);
-      setDuplicateInfo(null);
-      resetForm();
-      fetchLinks();
-    } catch (error) {
-      setError('Failed to save link');
-      console.error('Error saving link:', error);
+      await tasksAPI.updateStatus(taskId, status);
+      fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update task status');
     }
   };
 
-  const handleEdit = (link) => {
-    setEditingLink(link);
-    setFormData({
-      name: link.name,
-      url: link.url,
-      description: link.description || '',
-      category: link.category,
-      colorTag: link.colorTag,
-      tags: link.tags.join(', '),
-      isFavorite: link.isFavorite
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this link?')) {
-      try {
-        await linksAPI.delete(id);
-        fetchLinks();
-      } catch (error) {
-        setError('Failed to delete link');
-        console.error('Error deleting link:', error);
-      }
-    }
-  };
-
-  const handleToggleFavorite = async (id) => {
-    try {
-      await linksAPI.toggleFavorite(id);
-      fetchLinks();
-    } catch (error) {
-      setError('Failed to toggle favorite');
-      console.error('Error toggling favorite:', error);
-    }
-  };
-
-  const handleReanalyze = async (id) => {
-    try {
-      await linksAPI.reanalyze(id);
-      // Wait a bit for analysis to complete, then refresh
-      setTimeout(() => {
-        fetchLinks();
-      }, 2000);
-    } catch (error) {
-      setError('Failed to re-analyze link');
-      console.error('Error re-analyzing link:', error);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      url: '',
-      description: '',
-      category: 'other',
-      colorTag: 'blue',
-      tags: '',
-      isFavorite: false
-    });
-    setShowForm(false);
-  };
-
-  const getCategoryIcon = (category) => {
-    const icons = {
-      resume: '📄',
-      job: '💼',
-      favorite: '⭐',
-      work: '💻',
-      personal: '👤',
-      study: '📚',
-      other: '🔗'
-    };
-    return icons[category] || '🔗';
-  };
-
-  const getColorTagClass = (colorTag) => {
-    return `color-tag color-tag-${colorTag}`;
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const getContentTypeIcon = (contentType) => {
-    const icons = {
-      news: '📰',
-      tutorial: '📚',
-      documentation: '📖',
-      blog: '✍️',
-      video: '🎥',
-      image: '🖼️',
-      product: '🛍️',
-      general: '🔗',
-      unknown: '❓'
-    };
-    return icons[contentType] || icons.unknown;
-  };
-
-  const getComplexityColor = (complexity) => {
-    if (complexity < 0.3) return 'green';
-    if (complexity < 0.7) return 'orange';
-    return 'red';
-  };
+  const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
 
   return (
     <div className="main-container">
-      {/* Sidebar */}
-      <Sidebar 
-        onCategorySelect={setSelectedCategory}
-        selectedCategory={selectedCategory}
+      <Sidebar
+        dashboard={dashboard}
+        projects={projects}
+        tasks={tasks}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isOpen={sidebarOpen}
       />
 
-      {/* Main Content */}
       <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        {/* Header */}
         <div className="main-header">
           <div className="header-left">
-            <button 
-              className="sidebar-toggle"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              ☰
-            </button>
-            <h1>LinkVault</h1>
-            <p>Organize your digital life with smart link management</p>
+            <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
+            <h1>Team Task Manager</h1>
+            <p>Projects and tasks in one clean workspace</p>
           </div>
           <div className="header-right">
-            <button className="btn btn-secondary" onClick={() => setShowContact(true)}>
-              ℹ️ About
-            </button>
-            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-              ➕ Add Link
-            </button>
+            <button className="btn btn-secondary" onClick={() => setShowProjectForm(true)}>Create Project</button>
+            <button className="btn btn-primary" onClick={() => setShowTaskForm(true)}>Create Task</button>
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="search-filters">
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search links, keywords, or content..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <span className="search-icon">🔍</span>
-          </div>
-          
+          <div className="search-box"><strong>Status Filter</strong></div>
           <div className="filters">
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value)}
-              className="filter-select"
-            >
-              <option value="createdAt">Date Created</option>
-              <option value="name">Name</option>
-              <option value="category">Category</option>
-              <option value="aiAnalysis.readTime">Read Time</option>
-              <option value="aiAnalysis.complexity">Complexity</option>
-            </select>
-            
-            <select 
-              value={sortOrder} 
-              onChange={(e) => setSortOrder(e.target.value)}
-              className="filter-select"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-
-            <select 
-              value={contentTypeFilter} 
-              onChange={(e) => setContentTypeFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Types</option>
-              <option value="news">📰 News</option>
-              <option value="tutorial">📚 Tutorial</option>
-              <option value="documentation">📖 Documentation</option>
-              <option value="blog">✍️ Blog</option>
-              <option value="video">🎥 Video</option>
-              <option value="image">🖼️ Image</option>
-              <option value="product">🛍️ Product</option>
-              <option value="general">🔗 General</option>
-            </select>
-
-            <select 
-              value={complexityFilter} 
-              onChange={(e) => setComplexityFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Complexity</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="complex">Complex</option>
+            <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="ALL">ALL</option>
+              <option value="TODO">TODO</option>
+              <option value="IN_PROGRESS">IN_PROGRESS</option>
+              <option value="DONE">DONE</option>
             </select>
           </div>
         </div>
 
-        {/* Add/Edit Form */}
-        {showForm && (
+        {showProjectForm && (
           <div className="form-overlay">
             <div className="form-modal">
               <div className="form-header">
-                <h2>{editingLink ? 'Edit Link' : 'Add New Link'}</h2>
-                <button className="close-btn" onClick={resetForm}>✕</button>
+                <h2>Create Project</h2>
+                <button className="close-btn" onClick={() => setShowProjectForm(false)}>✕</button>
               </div>
-              
-              <form onSubmit={handleSubmit} className="link-form">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Name *</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      required
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>URL *</label>
-                    <input
-                      type="url"
-                      value={formData.url}
-                      onChange={(e) => setFormData({...formData, url: e.target.value})}
-                      required
-                      className="form-input"
-                    />
-                  </div>
+              <form onSubmit={handleProjectSubmit} className="link-form">
+                <div className="form-group">
+                  <label>Project Name *</label>
+                  <input className="form-input" required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} />
                 </div>
-
                 <div className="form-group">
                   <label>Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    className="form-textarea"
-                    rows="3"
-                  />
+                  <textarea className="form-textarea" value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} />
                 </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Category</label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
-                      className="form-select"
-                    >
-                      <option value="resume">📄 Resume</option>
-                      <option value="job">💼 Job</option>
-                      <option value="work">💻 Work</option>
-                      <option value="personal">👤 Personal</option>
-                      <option value="study">📚 Study</option>
-                      <option value="other">🔗 Other</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Color Tag</label>
-                    <div className="color-tag-selector">
-                      {['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray'].map(color => (
-                        <button
-                          key={color}
-                          type="button"
-                          className={`color-option ${formData.colorTag === color ? 'selected' : ''}`}
-                          onClick={() => setFormData({...formData, colorTag: color})}
-                        >
-                          <div className={`color-dot color-${color}`}></div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="form-group">
-                  <label>Tags (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={formData.tags}
-                    onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                    className="form-input"
-                    placeholder="work, important, reference"
-                  />
+                  <label>Member IDs (comma separated)</label>
+                  <input className="form-input" value={projectForm.memberIds} onChange={(e) => setProjectForm({ ...projectForm, memberIds: e.target.value })} />
                 </div>
-
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.isFavorite}
-                      onChange={(e) => setFormData({...formData, isFavorite: e.target.checked})}
-                      className="form-checkbox"
-                    />
-                    Mark as Favorite
-                  </label>
-                </div>
-
                 <div className="form-actions">
-                  <button type="button" onClick={resetForm} className="btn btn-secondary">
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    {editingLink ? 'Update Link' : 'Add Link'}
-                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowProjectForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">Create</button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* Duplicate Warning Modal */}
-        {showDuplicateWarning && (
+        {showTaskForm && (
           <div className="form-overlay">
             <div className="form-modal">
               <div className="form-header">
-                <h2>⚠️ Potential Duplicate Detected</h2>
-                <button className="close-btn" onClick={() => setShowDuplicateWarning(false)}>✕</button>
+                <h2>Create Task</h2>
+                <button className="close-btn" onClick={() => setShowTaskForm(false)}>✕</button>
               </div>
-              
-              <div className="duplicate-warning">
-                <p>This link appears to be similar to an existing link in your collection.</p>
-                <div className="similarity-info">
-                  <p><strong>Similarity Score:</strong> {Math.round(duplicateInfo.similarity * 100)}%</p>
-                  {duplicateInfo.similarLink && (
-                    <div className="similar-link">
-                      <p><strong>Similar to:</strong></p>
-                      <div className="similar-link-card">
-                        <h4>{duplicateInfo.similarLink.name}</h4>
-                        <p>{duplicateInfo.similarLink.url}</p>
-                      </div>
-                    </div>
-                  )}
+              <form onSubmit={handleTaskSubmit} className="link-form">
+                <div className="form-group">
+                  <label>Task Title *</label>
+                  <input className="form-input" required value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
                 </div>
-                
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea className="form-textarea" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Project *</label>
+                    <select className="form-select" required value={taskForm.projectId} onChange={(e) => setTaskForm({ ...taskForm, projectId: e.target.value })}>
+                      <option value="">Select</option>
+                      <option value="__new__">+ Add New Project</option>
+                      {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Assigned To *</label>
+                    <select className="form-select" required value={taskForm.assignedTo} onChange={(e) => setTaskForm({ ...taskForm, assignedTo: e.target.value })}>
+                      <option value="">Select</option>
+                      {users.map((u) => <option key={u._id} value={u._id}>{u.name} ({u.role})</option>)}
+                    </select>
+                  </div>
+                </div>
+                {taskForm.projectId === '__new__' && (
+                  <div className="form-group">
+                    <label>New Project Name *</label>
+                    <input
+                      className="form-input"
+                      required
+                      placeholder="Enter new project name"
+                      value={taskForm.newProjectName}
+                      onChange={(e) => setTaskForm({ ...taskForm, newProjectName: e.target.value })}
+                    />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Due Date</label>
+                  <input type="date" className="form-input" value={taskForm.dueDate} onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })} />
+                </div>
                 <div className="form-actions">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowDuplicateWarning(false)} 
-                    className="btn btn-secondary"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={handleDuplicateConfirm} 
-                    className="btn btn-primary"
-                  >
-                    Add Anyway
-                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowTaskForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">Create</button>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
         )}
 
-        {/* Links List */}
         <div className="links-container">
-          {loading ? (
-            <div className="loading">Loading links...</div>
-          ) : error ? (
+          {loading ? <div className="loading">Loading...</div> : error ? (
             <div className="error">{error}</div>
-          ) : links.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🔗</div>
-              <h3>No links found</h3>
-              <p>Start by adding your first link to get organized!</p>
-              <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-                Add Your First Link
-              </button>
-            </div>
+          ) : tasks.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">-</div><h3>No tasks found</h3><p>Create your first task.</p></div>
           ) : (
             <div className="links-grid">
-              {links.map((link) => (
-                <div key={link._id} className="link-card">
+              {tasks.map((task) => (
+                <div key={task._id} className="link-card">
                   <div className="link-header">
                     <div className="link-meta">
-                      <span className="category-icon">{getCategoryIcon(link.category)}</span>
-                      <span className="category-name">{link.category}</span>
-                      <div className={getColorTagClass(link.colorTag)}></div>
+                      <span className="category-icon">#</span>
+                      <span className="category-name">{task.project?.name || 'Project'}</span>
                     </div>
-                    <div className="link-actions">
-                      <button
-                        onClick={() => handleToggleFavorite(link._id)}
-                        className={`favorite-btn ${link.isFavorite ? 'favorited' : ''}`}
-                        title={link.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                      >
-                        {link.isFavorite ? '⭐' : '☆'}
-                      </button>
-                      <button
-                        onClick={() => handleEdit(link)}
-                        className="edit-btn"
-                        title="Edit link"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleReanalyze(link._id)}
-                        className="reanalyze-btn"
-                        title="Re-analyze with AI"
-                      >
-                        🤖
-                      </button>
-                      <button
-                        onClick={() => handleDelete(link._id)}
-                        className="delete-btn"
-                        title="Delete link"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    <select className="filter-select" value={task.status} onChange={(e) => handleStatusUpdate(task._id, e.target.value)}>
+                      <option value="TODO">TODO</option>
+                      <option value="IN_PROGRESS">IN_PROGRESS</option>
+                      <option value="DONE">DONE</option>
+                    </select>
                   </div>
-                  
                   <div className="link-content">
-                    <h3 className="link-title">{link.name}</h3>
-                    {link.description && (
-                      <p className="link-description">{link.description}</p>
-                    )}
-                    {link.aiAnalysis?.summary && (
-                      <p className="link-summary">{link.aiAnalysis.summary}</p>
-                    )}
-                    <a 
-                      href={link.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="link-url"
-                    >
-                      {link.url}
-                    </a>
+                    <h3 className="link-title">{task.title}</h3>
+                    <p className="link-description">{task.description || 'No description'}</p>
+                    <p className="link-url">Assigned To: {task.assignedTo?.name || '-'}</p>
+                    <p className="link-url">Created By: {task.createdBy?.name || '-'}</p>
+                    <p className="link-url">Due Date: {formatDate(task.dueDate)}</p>
                   </div>
-
-                  {/* AI Analysis Info */}
-                  {link.aiAnalysis && (
-                    <div className="ai-analysis">
-                      <div className="ai-stats">
-                        {link.aiAnalysis.readTime > 0 && (
-                          <span className="ai-stat read-time">
-                            ⏱️ {link.readTimeDisplay}
-                          </span>
-                        )}
-                        {link.aiAnalysis.contentType && link.aiAnalysis.contentType !== 'unknown' && (
-                          <span className="ai-stat content-type">
-                            {getContentTypeIcon(link.aiAnalysis.contentType)} {link.aiAnalysis.contentType}
-                          </span>
-                        )}
-                        {link.aiAnalysis.complexity > 0 && (
-                          <span className={`ai-stat complexity complexity-${getComplexityColor(link.aiAnalysis.complexity)}`}>
-                            📊 {link.complexityDisplay}
-                          </span>
-                        )}
-                        {link.aiAnalysis.wordCount > 0 && (
-                          <span className="ai-stat word-count">
-                            📝 {link.aiAnalysis.wordCount} words
-                          </span>
-                        )}
-                      </div>
-                      
-                      {link.aiAnalysis.keywords && link.aiAnalysis.keywords.length > 0 && (
-                        <div className="ai-keywords">
-                          <span className="keywords-label">Keywords:</span>
-                          {link.aiAnalysis.keywords.slice(0, 5).map((keyword, index) => (
-                            <span key={index} className="keyword">{keyword}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {link.tags && link.tags.length > 0 && (
-                    <div className="link-tags">
-                      {link.tags.map((tag, index) => (
-                        <span key={index} className="tag">{tag}</span>
-                      ))}
-                    </div>
-                  )}
-                  
                   <div className="link-footer">
-                    <span className="link-date">Added: {formatDate(link.createdAt)}</span>
-                    {link.aiAnalysis?.lastAnalyzed && (
-                      <span className="analysis-date">
-                        Analyzed: {formatDate(link.aiAnalysis.lastAnalyzed)}
-                      </span>
-                    )}
+                    <span className="link-date">Created: {formatDate(task.createdAt)}</span>
+                    <span className="analysis-date">Status: {task.status}</span>
                   </div>
                 </div>
               ))}
@@ -617,11 +277,6 @@ const Main = () => {
           )}
         </div>
       </div>
-
-      {/* Contact Modal */}
-      {showContact && (
-        <Contact onClose={() => setShowContact(false)} />
-      )}
     </div>
   );
 };

@@ -6,9 +6,10 @@ import './SignupPage.css';
 const SignupPage = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
-    password: ''
+    password: '',
+    role: 'MEMBER'
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,9 +28,17 @@ const SignupPage = ({ onLogin }) => {
     setError('');
 
     try {
-      const response = isLogin 
-        ? await authAPI.login(formData)
-        : await authAPI.register(formData);
+      const response = isLogin
+        ? await authAPI.login({
+            email: formData.email.trim().toLowerCase(),
+            password: formData.password
+          })
+        : await authAPI.register({
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            password: formData.password,
+            role: formData.role
+          });
 
       const { token, user } = response.data;
       
@@ -53,8 +62,13 @@ const SignupPage = ({ onLogin }) => {
             {isLogin ? 'Sign in to your account' : 'Create your account'}
           </h2>
           <p className="signup-subtitle">
-            {isLogin ? 'Welcome back! Please sign in to continue.' : 'Join LinkUp to manage your links efficiently.'}
+            {isLogin ? 'Welcome back! Please sign in to continue.' : 'Join Team Task Manager to manage projects and tasks.'}
           </p>
+          {isLogin && (
+            <p className="signup-credentials">
+              Admin login: <strong>admin@linkup.local</strong> / <strong>Admin@123</strong>
+            </p>
+          )}
         </div>
 
         <div className="signup-card">
@@ -67,18 +81,18 @@ const SignupPage = ({ onLogin }) => {
           <form className="signup-form" onSubmit={handleSubmit}>
             {!isLogin && (
               <div className="form-group">
-                <label htmlFor="username" className="form-label">
-                  Username
+                <label htmlFor="name" className="form-label">
+                  Full Name
                 </label>
                 <input
-                  id="username"
-                  name="username"
+                  id="name"
+                  name="name"
                   type="text"
                   required={!isLogin}
-                  value={formData.username}
+                  value={formData.name}
                   onChange={handleChange}
                   className="form-input"
-                  placeholder="Enter your username"
+                  placeholder="Enter your full name"
                 />
               </div>
             )}
@@ -116,6 +130,24 @@ const SignupPage = ({ onLogin }) => {
                 placeholder="Enter your password"
               />
             </div>
+
+            {!isLogin && (
+              <div className="form-group">
+                <label htmlFor="role" className="form-label">
+                  Role
+                </label>
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="form-input"
+                >
+                  <option value="MEMBER">Member</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+            )}
 
             <div className="form-group">
               <button

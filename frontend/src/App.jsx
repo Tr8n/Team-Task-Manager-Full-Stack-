@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Navbar from "./components/navbar";
 import Main from "./components/main";
 import SignupPage from "./components/SignupPage";
+import AdminDashboard from "./components/AdminDashboard";
 import "./App.css";
 
 function App() {
@@ -71,7 +72,7 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <Main />
+                {user?.role === "ADMIN" ? <AdminDashboard /> : <Main />}
               </ProtectedRoute>
             }
           />

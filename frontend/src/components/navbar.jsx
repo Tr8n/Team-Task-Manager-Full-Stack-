@@ -39,8 +39,8 @@ const Navbar = ({ user, onLogout }) => {
       <div className="nav-container">
         <div className="nav-left">
           <Link to="/" className="nav-brand">
-            <span className="brand-icon">🔗</span>
-            <span className="brand-text">LinkVault</span>
+            <span className="brand-icon">#</span>
+            <span className="brand-text">Team Task Manager</span>
           </Link>
         </div>
 
@@ -51,7 +51,7 @@ const Navbar = ({ user, onLogout }) => {
             onClick={toggleDarkMode}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {isDarkMode ? '☀️' : '🌙'}
+            {isDarkMode ? 'Light' : 'Dark'}
           </button>
 
           {user ? (
@@ -60,22 +60,22 @@ const Navbar = ({ user, onLogout }) => {
                 className="user-button"
                 onClick={() => setShowDropdown(!showDropdown)}
               >
-                <span className="user-avatar">👤</span>
-                <span className="user-name">{user.uid}</span>
+                <span className="user-avatar">U</span>
+                <span className="user-name">{user.name || user.email}</span>
                 <span className="dropdown-arrow">▼</span>
               </button>
               
               {showDropdown && (
                 <div className="dropdown-menu">
                   <div className="dropdown-header">
-                    <span className="user-email">{user.uid}</span>
+                    <span className="user-email">{user.email} ({user.role})</span>
                   </div>
                   <div className="dropdown-divider"></div>
                   <button 
                     className="dropdown-item"
                     onClick={handleLogout}
                   >
-                    <span className="dropdown-icon">🚪</span>
+                    <span className="dropdown-icon">{'->'}</span>
                     Logout
                   </button>
                 </div>
@@ -83,7 +83,7 @@ const Navbar = ({ user, onLogout }) => {
             </div>
           ) : (
             <Link to="/signup" className="nav-link">
-              <span className="link-icon">🔑</span>
+              <span className="link-icon">{'>'}</span>
               Login
             </Link>
           )}

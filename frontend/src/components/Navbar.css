@@ -1,10 +1,11 @@
 .navbar {
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
   border-bottom: 1px solid var(--border-color);
   padding: 0.75rem 0;
   position: sticky;
   top: 0;
   z-index: 200;
+  backdrop-filter: blur(10px);
 }
 
 .nav-container {
@@ -27,26 +28,23 @@
   gap: 0.5rem;
   text-decoration: none;
   color: var(--text-primary);
-  font-weight: 700;
-  font-size: 1.3rem;
+  font-weight: 650;
+  font-size: 1.15rem;
   transition: all 0.2s ease;
 }
 
 .nav-brand:hover {
   color: var(--accent-color);
-  transform: scale(1.05);
+  transform: translateY(-1px);
 }
 
 .brand-icon {
-  font-size: 1.5rem;
+  font-size: 1rem;
+  color: var(--text-muted);
 }
 
 .brand-text {
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-weight: 700;
 }
 
 .nav-right {
@@ -74,7 +72,7 @@
 .theme-toggle:hover {
   background: var(--bg-hover);
   border-color: var(--accent-color);
-  transform: scale(1.1);
+  transform: translateY(-1px);
 }
 
 /* User Menu */
@@ -131,7 +129,7 @@
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.14);
   min-width: 200px;
   z-index: 1000;
   overflow: hidden;
@@ -195,7 +193,7 @@
 .nav-link:hover {
   background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2);
 }
 
 .link-icon {
